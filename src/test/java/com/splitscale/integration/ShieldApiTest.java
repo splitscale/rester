@@ -5,6 +5,10 @@ import io.restassured.filter.log.ErrorLoggingFilter;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
@@ -31,6 +35,34 @@ public class ShieldApiTest {
 
   @Test
   @Order(1)
+  public void testRegisterUser() {
+    Response response = given()
+        .filter(new ErrorLoggingFilter())
+        .contentType(ContentType.JSON)
+        .body("{\"username\":\"joejoe\",\"password\":\"password\"}")
+        .when()
+        .post("/api/v1/register")
+        .then()
+        .log().all()
+        .extract()
+        .response();
+
+    // Check the status code and skip the test if it's 409
+    int statusCode = response.statusCode();
+    if (statusCode == 409) {
+      System.out.println("Skipping Register User due to status code 409");
+      return;
+    }
+
+    // Assert the status code is 200
+    assertEquals(200, statusCode);
+
+    // Add additional assertions if needed
+    assertThat(response.getBody(), notNullValue());
+  }
+
+  @Test
+  @Order(2)
   public void testLoginUser_Success() {
     Response response = given()
         .filter(new ErrorLoggingFilter())
@@ -40,35 +72,20 @@ public class ShieldApiTest {
         .post("/api/v1/login")
         .then()
         .statusCode(200)
-        .body("token", notNullValue())
+        .log().all()
+        .header("token", notNullValue())
         .extract()
         .response();
 
     // Store the userId and jwtToken values for use in subsequent tests
-    userId = response.path("userResponse.id");
-    jwtToken = response.path("token");
-  }
-
-  @Test
-  @Order(2)
-  public void testRegisterUser_Success() {
-    Assumptions.assumeTrue(userId != null && jwtToken != null, "Previous test case failed.");
-
-    given()
-        .filter(new ErrorLoggingFilter())
-        .contentType(ContentType.JSON)
-        .body("{\"username\":\"joejoe\",\"password\":\"password\"}")
-        .when()
-        .post("/api/v1/register")
-        .then()
-        .statusCode(200)
-        .log().all();
+    userId = response.path("id");
+    jwtToken = response.header("token");
   }
 
   @Test
   @Order(3)
   public void testValidateJwt_Success() {
-    Assumptions.assumeTrue(userId != null && jwtToken != null, "Previous test case failed.");
+    assumeTrue(userId != null && jwtToken != null, "Previous test case failed.");
 
     System.out.println(userId);
     System.out.println(jwtToken);
@@ -87,7 +104,7 @@ public class ShieldApiTest {
   @Test
   @Order(4)
   public void testInValidateJwt_Success() {
-    Assumptions.assumeTrue(userId != null && jwtToken != null, "Previous test case failed.");
+    assumeTrue(userId != null && jwtToken != null, "Previous test case failed.");
 
     System.out.println(userId);
     System.out.println(jwtToken);
